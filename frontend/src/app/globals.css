@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply scroll-smooth; }
+  body { @apply bg-gray-50 text-gray-900 antialiased; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 text-white
+           font-medium text-sm hover:bg-brand-700 active:bg-brand-900
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300
+           bg-white text-gray-700 font-medium text-sm hover:bg-gray-50
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+  .badge-free  { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800; }
+  .badge-premium { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800; }
+
+  /* Markdown-like chapter body styling */
+  .prose-chapter h1 { @apply text-2xl font-bold mt-0 mb-4 text-gray-900; }
+  .prose-chapter h2 { @apply text-xl font-semibold mt-8 mb-3 text-gray-800; }
+  .prose-chapter h3 { @apply text-lg font-semibold mt-6 mb-2 text-gray-800; }
+  .prose-chapter p  { @apply mb-4 leading-relaxed text-gray-700; }
+  .prose-chapter ul { @apply mb-4 ml-5 list-disc space-y-1 text-gray-700; }
+  .prose-chapter ol { @apply mb-4 ml-5 list-decimal space-y-1 text-gray-700; }
+  .prose-chapter li { @apply leading-relaxed; }
+  .prose-chapter code {
+    @apply px-1.5 py-0.5 rounded bg-gray-100 text-sm font-mono text-brand-700;
+  }
+  .prose-chapter pre {
+    @apply my-4 p-4 rounded-lg bg-gray-900 text-gray-100 text-sm font-mono overflow-x-auto;
+  }
+  .prose-chapter pre code { @apply bg-transparent text-inherit p-0; }
+  .prose-chapter blockquote {
+    @apply my-4 pl-4 border-l-4 border-brand-300 text-gray-600 italic;
+  }
+  .prose-chapter strong { @apply font-semibold text-gray-900; }
+  .prose-chapter a { @apply text-brand-600 underline hover:text-brand-800; }
+  .prose-chapter table { @apply w-full mb-4 border-collapse text-sm; }
+  .prose-chapter th { @apply px-3 py-2 bg-gray-100 border border-gray-300 font-semibold text-left; }
+  .prose-chapter td { @apply px-3 py-2 border border-gray-300; }
+}

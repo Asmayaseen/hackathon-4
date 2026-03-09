@@ -1,0 +1,746 @@
+openapi: "3.1.0"
+info:
+  title: Course Companion FTE — Phase 1 Backend API
+  description: |
+    Zero-Backend-LLM deterministic API for the Course Companion FTE.
+    All LLM reasoning is performed by the ChatGPT App frontend.
+    This backend performs ZERO LLM inference.
+    Course topic: AI Agent Development (Claude SDK, MCP, Agent Skills).
+  version: "1.0.0"
+  contact:
+    name: Panaversity Hackathon IV Team
+
+servers:
+  - url: https://course-companion.fly.dev
+    description: Production (Fly.io)
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: Chapters
+    description: Course content delivery and navigation
+  - name: Search
+    description: Grounded Q&A content retrieval
+  - name: Quizzes
+    description: Rule-based quiz delivery and grading
+  - name: Progress
+    description: Student progress tracking and streaks
+  - name: Access
+    description: Freemium tier access control
+  - name: Health
+    description: Service health check
+
+paths:
+
+  # ─────────────────────────────────────────────
+  # CHAPTERS
+  # ─────────────────────────────────────────────
+
+  /chapters:
+    get:
+      tags: [Chapters]
+      operationId: listChapters
+      summary: List all chapters (metadata only)
+      description: Returns chapter listing with title, order, tier, and quiz availability.
+        Body text is NOT included — use GET /chapters/{id} for full content.
+      parameters:
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        "200":
+          description: Chapter list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chapters:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChapterMeta'
+                  total:
+                    type: integer
+                    example: 5
+
+  /chapters/{chapter_id}:
+    get:
+      tags: [Chapters]
+      operationId: getChapter
+      summary: Get full chapter content
+      description: |
+        Returns chapter title, body text (verbatim from Cloudflare R2), and metadata.
+        Access control is enforced: free-tier users can only access chapters 1–3.
+      parameters:
+        - $ref: '#/components/parameters/ChapterId'
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        "200":
+          description: Full chapter content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chapter'
+        "403":
+          description: Premium content blocked for free-tier user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessDenied'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /chapters/{chapter_id}/next:
+    get:
+      tags: [Chapters]
+      operationId: getNextChapter
+      summary: Get next chapter metadata
+      description: Returns the next chapter in sequence. Returns boundary indicator
+        if current chapter is the last.
+      parameters:
+        - $ref: '#/components/parameters/ChapterId'
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        "200":
+          description: Next chapter navigation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChapterNavigation'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /chapters/{chapter_id}/previous:
+    get:
+      tags: [Chapters]
+      operationId: getPreviousChapter
+      summary: Get previous chapter metadata
+      description: Returns the previous chapter in sequence. Returns boundary indicator
+        if current chapter is the first.
+      parameters:
+        - $ref: '#/components/parameters/ChapterId'
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        "200":
+          description: Previous chapter navigation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChapterNavigation'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # SEARCH
+  # ─────────────────────────────────────────────
+
+  /search:
+    get:
+      tags: [Search]
+      operationId: searchContent
+      summary: Search course content for Q&A grounding
+      description: |
+        Returns top 3–5 most relevant content sections for a query using
+        PostgreSQL full-text search. Results are filtered to chapters the user
+        has access to. ChatGPT MUST answer only from these returned sections.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Student's question or search query
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 500
+            example: "What is an MCP server?"
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 10
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        "422":
+          $ref: '#/components/responses/ValidationError'
+
+  # ─────────────────────────────────────────────
+  # QUIZZES
+  # ─────────────────────────────────────────────
+
+  /quizzes/chapter/{chapter_id}:
+    get:
+      tags: [Quizzes]
+      operationId: getQuizByChapter
+      summary: Get quiz questions for a chapter
+      description: |
+        Returns quiz questions with answer options. The correct answer (answer key)
+        is NEVER included in this response — only stored server-side for grading.
+      parameters:
+        - $ref: '#/components/parameters/ChapterId'
+        - $ref: '#/components/parameters/UserIdHeader'
+      responses:
+        "200":
+          description: Quiz questions (no answer key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResponse'
+        "403":
+          description: Premium content blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessDenied'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /quizzes/{quiz_id}/submit:
+    post:
+      tags: [Quizzes]
+      operationId: submitQuiz
+      summary: Submit quiz answers for grading
+      description: |
+        Grades the submitted answers against the server-side answer key.
+        Returns score, per-question pass/fail, correct answers, and explanations.
+        No LLM is involved in grading — pure rule-based comparison.
+        Multiple submissions are allowed; each is independently recorded.
+      parameters:
+        - name: quiz_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizSubmissionRequest'
+      responses:
+        "200":
+          description: Grading result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResult'
+        "400":
+          description: Incomplete submission or invalid answers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # PROGRESS
+  # ─────────────────────────────────────────────
+
+  /progress/{user_id}:
+    get:
+      tags: [Progress]
+      operationId: getUserProgress
+      summary: Get student progress summary
+      description: |
+        Returns completed chapters, quiz scores, current streak, and
+        course completion percentage. Auto-creates a zero-state record
+        if user_id is unrecognised.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        "200":
+          description: Progress summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProgress'
+
+  /progress/{user_id}/chapters/{chapter_id}:
+    put:
+      tags: [Progress]
+      operationId: markChapterComplete
+      summary: Mark a chapter as completed
+      description: |
+        Records chapter completion for the user. Updates streak based on
+        last activity date (UTC). Returns updated progress summary.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/ChapterId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                completed:
+                  type: boolean
+                  default: true
+              required: [completed]
+      responses:
+        "200":
+          description: Updated progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProgress'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # ACCESS CONTROL
+  # ─────────────────────────────────────────────
+
+  /access/check:
+    get:
+      tags: [Access]
+      operationId: checkAccess
+      summary: Check if user can access a resource
+      description: |
+        Validates whether the user's tier permits access to the requested resource.
+        Free tier: chapters 1–3 only. Premium/Pro: all chapters.
+        ChatGPT App MUST call this before fetching content or quizzes.
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "user_abc123"
+        - name: resource
+          in: query
+          required: true
+          description: "Resource identifier, e.g. 'chapter_4' or 'quiz_4'"
+          schema:
+            type: string
+          example: "chapter_4"
+      responses:
+        "200":
+          description: Access decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessCheck'
+
+  # ─────────────────────────────────────────────
+  # HEALTH
+  # ─────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: Service health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+# ─────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────
+
+components:
+
+  parameters:
+    ChapterId:
+      name: chapter_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 128
+      example: "user_abc123"
+
+    UserIdHeader:
+      name: X-User-ID
+      in: header
+      required: true
+      description: Student identifier injected by the ChatGPT App
+      schema:
+        type: string
+        maxLength: 128
+      example: "user_abc123"
+
+  schemas:
+
+    ChapterMeta:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Introduction to AI Agents"
+        order_index:
+          type: integer
+          example: 1
+        tier:
+          type: string
+          enum: [free, premium]
+          example: "free"
+        has_quiz:
+          type: boolean
+          example: true
+        summary:
+          type: string
+          example: "Learn what AI agents are and how they work."
+      required: [id, title, order_index, tier, has_quiz]
+
+    Chapter:
+      allOf:
+        - $ref: '#/components/schemas/ChapterMeta'
+        - type: object
+          properties:
+            body:
+              type: string
+              description: Full chapter text (verbatim from Cloudflare R2)
+              example: "# Introduction to AI Agents\n\nAn AI agent is..."
+            word_count:
+              type: integer
+              example: 1200
+            total_chapters:
+              type: integer
+              example: 5
+          required: [body]
+
+    ChapterNavigation:
+      type: object
+      properties:
+        current_chapter_id:
+          type: integer
+          example: 2
+        target:
+          oneOf:
+            - $ref: '#/components/schemas/ChapterMeta'
+            - type: "null"
+          description: "null if at boundary (first/last chapter)"
+        is_boundary:
+          type: boolean
+          example: false
+        boundary_type:
+          type: string
+          enum: [first, last]
+          nullable: true
+          example: null
+      required: [current_chapter_id, is_boundary]
+
+    SearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+          example: "What is an MCP server?"
+        total:
+          type: integer
+          example: 3
+        no_results:
+          type: boolean
+          example: false
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentSection'
+      required: [query, total, no_results, sections]
+
+    ContentSection:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        chapter_id:
+          type: integer
+          example: 2
+        chapter_title:
+          type: string
+          example: "Model Context Protocol (MCP)"
+        text:
+          type: string
+          example: "MCP (Model Context Protocol) is a standard that enables..."
+        relevance_score:
+          type: number
+          format: float
+          example: 0.87
+      required: [id, chapter_id, chapter_title, text, relevance_score]
+
+    QuizResponse:
+      type: object
+      properties:
+        quiz_id:
+          type: integer
+          example: 1
+        chapter_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Chapter 1 Quiz: AI Agent Fundamentals"
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizQuestion'
+        total_questions:
+          type: integer
+          example: 5
+        no_quiz_available:
+          type: boolean
+          example: false
+      required: [quiz_id, chapter_id, title, questions, total_questions, no_quiz_available]
+
+    QuizQuestion:
+      type: object
+      description: Question without correct answer (answer key is server-side only)
+      properties:
+        id:
+          type: integer
+          example: 1
+        position:
+          type: integer
+          example: 1
+        question_text:
+          type: string
+          example: "What does MCP stand for?"
+        options:
+          type: object
+          properties:
+            A:
+              type: string
+              example: "Model Context Protocol"
+            B:
+              type: string
+              example: "Multi-Channel Processing"
+            C:
+              type: string
+              example: "Message Coordination Protocol"
+            D:
+              type: string
+              example: "Machine Control Pipeline"
+          required: [A, B, C, D]
+      required: [id, position, question_text, options]
+
+    QuizSubmissionRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: "user_abc123"
+        answers:
+          type: object
+          description: "Map of question_id (string) to selected option (A/B/C/D)"
+          additionalProperties:
+            type: string
+            enum: [A, B, C, D]
+          example:
+            "1": "A"
+            "2": "C"
+            "3": "B"
+            "4": "D"
+            "5": "A"
+      required: [user_id, answers]
+
+    QuizResult:
+      type: object
+      properties:
+        submission_id:
+          type: integer
+          example: 101
+        quiz_id:
+          type: integer
+          example: 1
+        user_id:
+          type: string
+          example: "user_abc123"
+        score:
+          type: integer
+          example: 4
+        max_score:
+          type: integer
+          example: 5
+        percentage:
+          type: number
+          format: float
+          example: 80.0
+        passed:
+          type: boolean
+          example: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionResult'
+      required: [submission_id, quiz_id, user_id, score, max_score, percentage, passed, results]
+
+    QuestionResult:
+      type: object
+      properties:
+        question_id:
+          type: integer
+          example: 1
+        submitted_answer:
+          type: string
+          enum: [A, B, C, D]
+          example: "A"
+        correct_answer:
+          type: string
+          enum: [A, B, C, D]
+          example: "A"
+        passed:
+          type: boolean
+          example: true
+        explanation:
+          type: string
+          nullable: true
+          example: "MCP stands for Model Context Protocol, the standard for..."
+      required: [question_id, submitted_answer, correct_answer, passed]
+
+    UserProgress:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: "user_abc123"
+        tier:
+          type: string
+          enum: [free, premium, pro]
+          example: "free"
+        completed_chapters:
+          type: array
+          items:
+            type: integer
+          example: [1, 2]
+        quiz_scores:
+          type: object
+          description: "Map of chapter_id (string) to latest quiz score (integer)"
+          additionalProperties:
+            type: integer
+          example:
+            "1": 4
+            "2": 5
+        current_streak:
+          type: integer
+          example: 3
+        longest_streak:
+          type: integer
+          example: 5
+        last_activity_date:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-03-09"
+        course_completion_pct:
+          type: number
+          format: float
+          example: 40.0
+        total_quiz_score:
+          type: integer
+          example: 9
+      required:
+        - user_id
+        - tier
+        - completed_chapters
+        - quiz_scores
+        - current_streak
+        - longest_streak
+        - course_completion_pct
+
+    AccessCheck:
+      type: object
+      properties:
+        access:
+          type: boolean
+          example: false
+        reason:
+          type: string
+          nullable: true
+          enum: [premium_required, null]
+          example: "premium_required"
+        upgrade_url:
+          type: string
+          nullable: true
+          example: "https://course-companion.fly.dev/upgrade"
+      required: [access]
+
+    AccessDenied:
+      type: object
+      properties:
+        access:
+          type: boolean
+          example: false
+        reason:
+          type: string
+          example: "premium_required"
+        upgrade_url:
+          type: string
+          example: "https://course-companion.fly.dev/upgrade"
+        message:
+          type: string
+          example: "This chapter requires a Premium subscription."
+      required: [access, reason, upgrade_url, message]
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "validation_error"
+        message:
+          type: string
+          example: "Missing answers for questions: [3, 4]"
+        missing_questions:
+          type: array
+          items:
+            type: integer
+          nullable: true
+          example: [3, 4]
+      required: [error, message]
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "not_found"
+              message:
+                type: string
+                example: "Chapter with id=99 does not exist."
+            required: [error, message]
+
+    ValidationError:
+      description: Request validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
