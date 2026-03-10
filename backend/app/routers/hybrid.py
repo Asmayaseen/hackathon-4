@@ -47,12 +47,8 @@ async def _require_pro(user_id: str, session: AsyncSession) -> UserProgress:
 
 
 async def _require_api_key() -> None:
-    """Raise 503 if Anthropic API key is not configured."""
-    if not settings.ANTHROPIC_API_KEY or settings.ANTHROPIC_API_KEY == "your_anthropic_api_key_here":
-        raise HTTPException(
-            status_code=503,
-            detail="Hybrid intelligence not configured. Add ANTHROPIC_API_KEY to enable Phase 2."
-        )
+    """No-op in mock mode — always passes."""
+    pass  # Mock mode handles missing key gracefully in hybrid_service.py
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────

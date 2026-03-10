@@ -6,28 +6,30 @@ Uses Claude Sonnet for:
 
 ISOLATION RULE: This file is the ONLY place in backend/app/ where LLM calls are made.
 All Phase 1 routes must remain zero-LLM.
+
+MOCK MODE: When ANTHROPIC_API_KEY is not set, returns realistic demo responses.
 """
 import json
 from decimal import Decimal
 
-from anthropic import Anthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.chapter import Chapter
-from app.models.content_section import ContentSection
 from app.models.hybrid_usage import HybridUsage
 from app.schemas.hybrid import AssessmentResponse, SynthesisResponse
 
 # Claude Sonnet pricing (per million tokens)
-_INPUT_COST_PER_M = Decimal("3.00")   # $3.00 / 1M input tokens
-_OUTPUT_COST_PER_M = Decimal("15.00") # $15.00 / 1M output tokens
+_INPUT_COST_PER_M = Decimal("3.00")
+_OUTPUT_COST_PER_M = Decimal("15.00")
 
 MODEL = "claude-sonnet-4-6"
+_MOCK = not settings.ANTHROPIC_API_KEY or settings.ANTHROPIC_API_KEY == "your_anthropic_api_key_here"
 
 
-def _get_client() -> Anthropic:
+def _get_client():
+    from anthropic import Anthropic
     return Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 
@@ -66,13 +68,28 @@ async def assess_answer(
     user_id: str,
     session: AsyncSession,
 ) -> AssessmentResponse:
-    """Grade a free-form written answer using Claude Sonnet."""
+    """Grade a free-form written answer using Claude Sonnet (or mock in demo mode)."""
 
-    # Fetch chapter content as grounding material
     chapter = await session.get(Chapter, chapter_id)
-    chapter_body = chapter.body or "" if chapter else ""
     chapter_title = chapter.title if chapter else f"Chapter {chapter_id}"
 
+    # ── Mock mode (no API key) ────────────────────────────────────────────────
+    if _MOCK:
+        word_count = len(student_answer.split())
+        score = min(10, max(4, word_count // 5))
+        await _log_usage(session, user_id, "assess", [chapter_id], 450, 120, Decimal("0.000000"))
+        return AssessmentResponse(
+            score=score,
+            feedback=f"[DEMO MODE] Your answer about '{chapter_title}' shows good effort. "
+                     f"You covered {word_count} words — a real Claude assessment would give deeper insight.",
+            strengths=["Clear structure in your response", "Relevant terminology used"],
+            improvements=["Add more specific examples", "Connect concepts to real-world use cases"],
+            tokens_used=570,
+            cost_usd=Decimal("0.000000"),
+        )
+
+    # ── Real Claude call ──────────────────────────────────────────────────────
+    chapter_body = chapter.body or "" if chapter else ""
     prompt = f"""You are an expert educational assessor for the course "AI Agent Development".
 
 CHAPTER CONTENT (use this as grounding):
@@ -136,16 +153,63 @@ async def synthesize_chapters(
     user_id: str,
     session: AsyncSession,
 ) -> SynthesisResponse:
-    """Generate a cross-chapter synthesis using Claude Sonnet."""
+    """Generate a cross-chapter synthesis using Claude Sonnet (or mock in demo mode)."""
 
-    # Fetch content for each chapter
-    chapters_content = []
     chapter_titles = []
+    for cid in chapter_ids:
+        chapter = await session.get(Chapter, cid)
+        if chapter:
+            chapter_titles.append(chapter.title)
+
+    # ── Mock mode ─────────────────────────────────────────────────────────────
+    if _MOCK:
+        titles_str = ", ".join(chapter_titles)
+        focus_line = f"\n\n**Focus:** {focus_question}" if focus_question else ""
+        mock_synthesis = f"""## Big Picture: AI Agent Development{focus_line}
+
+> **[DEMO MODE]** — This is a sample synthesis. Add `ANTHROPIC_API_KEY` for real Claude AI synthesis.
+
+## Overview
+
+The chapters you selected — **{titles_str}** — together form the complete foundation of modern AI agent development.
+
+## How These Concepts Connect
+
+**AI Agents** (Chapter 1) are the core unit — autonomous systems that perceive, reason, and act. They need two things to be useful: a way to *reason* and a way to *act*.
+
+**Claude Agent SDK** (Chapter 2) provides the reasoning layer — giving agents memory, tool use, and multi-turn conversation abilities. Without the SDK, an agent cannot maintain context or use external tools.
+
+**Model Context Protocol (MCP)** (Chapter 3) solves the action layer — it is the universal standard that lets agents connect to any tool, database, or service. MCP is to agents what USB is to computers.
+
+**Agent Skills (SKILL.md)** (Chapter 4) encode procedural knowledge — teaching agents *how* to perform specific tasks consistently. Skills are the "training manual" for an agent.
+
+**A2A Protocol** (Chapter 5) enables collaboration — allowing multiple specialized agents to work together, each contributing its unique skills.
+
+## Key Insight
+
+These technologies form a complete stack:
+- **What** the agent is → AI Agent fundamentals
+- **How** it thinks → Claude Agent SDK
+- **What** it connects to → MCP
+- **How** it behaves → SKILL.md
+- **Who** it works with → A2A Protocol
+
+Together, they enable the Agent Factory vision: manufacturing specialized Digital FTEs at scale."""
+
+        await _log_usage(session, user_id, "synthesize", chapter_ids, 800, 350, Decimal("0.000000"))
+        return SynthesisResponse(
+            synthesis=mock_synthesis,
+            chapters_used=chapter_titles,
+            tokens_used=1150,
+            cost_usd=Decimal("0.000000"),
+        )
+
+    # ── Real Claude call ──────────────────────────────────────────────────────
+    chapters_content = []
     for cid in chapter_ids:
         chapter = await session.get(Chapter, cid)
         if not chapter:
             continue
-        chapter_titles.append(chapter.title)
         body = chapter.body or ""
         chapters_content.append(f"## {chapter.title}\n{body[:1500]}")
 
