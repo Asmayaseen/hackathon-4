@@ -637,7 +637,10 @@ QUIZZES_DATA = [
 
 
 async def seed_database():
-    engine = create_async_engine(settings.DATABASE_URL)
+    import ssl
+    url = settings.DATABASE_URL.split("?")[0]
+    ssl_ctx = ssl.create_default_context()
+    engine = create_async_engine(url, connect_args={"ssl": ssl_ctx})
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with session_factory() as session:
@@ -660,12 +663,14 @@ async def seed_database():
                 order_index=ch_data["order_index"],
                 tier=ch_data["tier"],
                 summary=ch_data["summary"],
+                body=ch_data["body"],          # store in DB as fallback
+                word_count=ch_data["word_count"],
             )
             session.add(chapter)
             await session.flush()
             chapter_map[ch_data["order_index"]] = chapter
 
-            # Upload to R2
+            # Upload to R2 (optional — skipped when R2_ACCOUNT_ID=local)
             from app.r2_client import upload_chapter_body
             try:
                 upload_chapter_body(r2_key, {
@@ -676,7 +681,7 @@ async def seed_database():
                 })
                 print(f"  ✓ Chapter {ch_data['order_index']}: {ch_data['title']} → R2")
             except Exception as e:
-                print(f"  ⚠ R2 upload failed for chapter {ch_data['order_index']}: {e}")
+                print(f"  ⚠ R2 skipped for chapter {ch_data['order_index']} (body saved to DB)")
 
         await session.commit()
 

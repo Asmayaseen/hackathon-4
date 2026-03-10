@@ -29,8 +29,10 @@ async def get_chapter(chapter_id: int, session: AsyncSession) -> ChapterDetail:
     if not chapter:
         return None
 
-    # Fetch body verbatim from Cloudflare R2
+    # Try R2 first; fall back to DB body column
     r2_data = fetch_chapter_body(chapter.r2_key)
+    body = r2_data.get("body") or chapter.body or ""
+    word_count = r2_data.get("word_count") or chapter.word_count or 0
 
     # Count total chapters for navigation context
     count_result = await session.execute(select(Chapter))
@@ -43,8 +45,8 @@ async def get_chapter(chapter_id: int, session: AsyncSession) -> ChapterDetail:
         tier=chapter.tier,
         has_quiz=chapter.quiz_id is not None,
         summary=chapter.summary,
-        body=r2_data.get("body", ""),
-        word_count=r2_data.get("word_count", 0),
+        body=body,
+        word_count=word_count,
         total_chapters=total,
     )
 

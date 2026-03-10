@@ -38,9 +38,12 @@ def do_run_migrations(connection):
 
 
 async def run_async_migrations() -> None:
+    import ssl
     from app.config import settings
 
-    connectable = create_async_engine(settings.DATABASE_URL)
+    url = settings.DATABASE_URL.split("?")[0]  # strip sslmode params
+    ssl_ctx = ssl.create_default_context()
+    connectable = create_async_engine(url, connect_args={"ssl": ssl_ctx})
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()

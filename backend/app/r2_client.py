@@ -1,13 +1,14 @@
 import json
 from typing import Any
 
-import boto3
-from botocore.exceptions import ClientError
-
 from app.config import settings
 
+# R2 is optional — if credentials are "local", skip R2 entirely
+_R2_ENABLED = settings.R2_ACCOUNT_ID not in ("local", "", None)
 
-def get_r2_client() -> Any:
+
+def _get_r2_client() -> Any:
+    import boto3
     return boto3.client(
         "s3",
         endpoint_url=f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
@@ -18,8 +19,11 @@ def get_r2_client() -> Any:
 
 
 def fetch_chapter_body(r2_key: str) -> dict[str, Any]:
-    """Fetch chapter JSON from Cloudflare R2. Returns dict with body, word_count."""
-    client = get_r2_client()
+    """Fetch chapter JSON from Cloudflare R2. Returns empty dict when R2 not configured."""
+    if not _R2_ENABLED:
+        return {}
+    from botocore.exceptions import ClientError
+    client = _get_r2_client()
     try:
         response = client.get_object(Bucket=settings.R2_BUCKET_NAME, Key=r2_key)
         content = response["Body"].read().decode("utf-8")
@@ -32,8 +36,10 @@ def fetch_chapter_body(r2_key: str) -> dict[str, Any]:
 
 
 def upload_chapter_body(r2_key: str, data: dict[str, Any]) -> None:
-    """Upload chapter JSON to Cloudflare R2."""
-    client = get_r2_client()
+    """Upload chapter JSON to Cloudflare R2. No-op when R2 not configured."""
+    if not _R2_ENABLED:
+        return
+    client = _get_r2_client()
     client.put_object(
         Bucket=settings.R2_BUCKET_NAME,
         Key=r2_key,
