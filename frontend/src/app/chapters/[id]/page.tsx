@@ -13,6 +13,7 @@ import {
 import type { ChapterDetail, ChapterNavigation } from '@/types'
 import { DEFAULT_USER_ID } from '@/lib/api'
 import SimpleMarkdown from '@/components/ui/SimpleMarkdown'
+import AssessmentPanel from '@/components/ui/AssessmentPanel'
 
 export default function ChapterPage() {
   const { id } = useParams<{ id: string }>()
@@ -123,6 +124,9 @@ export default function ChapterPage() {
       <div className="card p-6 md:p-8 mb-6">
         <SimpleMarkdown content={chapter.body} />
       </div>
+
+      {/* Phase 2 — AI Assessment Panel */}
+      <AssessmentPanel chapterId={chapterId} chapterTitle={chapter.title} />
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3 mb-8">

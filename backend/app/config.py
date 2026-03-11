@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     UPGRADE_URL: str = "https://course-companion.fly.dev/upgrade"
 
+    # Phase 2 — Hybrid Intelligence
+    ANTHROPIC_API_KEY: str = ""  # Required for Phase 2 hybrid features
+
     # Course config
     FREE_TIER_MAX_CHAPTER: int = 3  # Chapters 1–3 are free
 

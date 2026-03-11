@@ -96,6 +96,35 @@ export async function markChapterComplete(
   })
 }
 
+// ─── Phase 2 Hybrid Intelligence ─────────────────────────────────────────────
+
+export async function assessAnswer(
+  chapterId: number,
+  question: string,
+  studentAnswer: string,
+  userId?: string,
+) {
+  return apiFetch('/hybrid/assess', {
+    method: 'POST',
+    body: JSON.stringify({ chapter_id: chapterId, question, student_answer: studentAnswer }),
+  }, userId)
+}
+
+export async function synthesizeChapters(
+  chapterIds: number[],
+  focusQuestion?: string,
+  userId?: string,
+) {
+  return apiFetch('/hybrid/synthesize', {
+    method: 'POST',
+    body: JSON.stringify({ chapter_ids: chapterIds, focus_question: focusQuestion }),
+  }, userId)
+}
+
+export async function getHybridUsage(userId: string) {
+  return apiFetch(`/hybrid/usage/${userId}`, {}, userId)
+}
+
 // ─── Access ───────────────────────────────────────────────────────────────────
 
 export async function checkAccess(
