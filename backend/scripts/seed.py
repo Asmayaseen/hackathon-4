@@ -729,6 +729,29 @@ async def seed_database():
 
         await session.commit()
 
+        print("\nSeeding demo user (web_user_001) as Pro tier...")
+        from app.models.user_progress import UserProgress
+        from datetime import date as date_type
+        existing_user = await session.get(UserProgress, "web_user_001")
+        if existing_user is None:
+            demo_user = UserProgress(
+                user_id="web_user_001",
+                tier="pro",
+                completed_chapters=[],
+                quiz_scores={},
+                current_streak=0,
+                longest_streak=0,
+                last_activity_date=date_type.today(),
+            )
+            session.add(demo_user)
+            await session.commit()
+            print("  ✓ web_user_001 created with Pro tier")
+        else:
+            existing_user.tier = "pro"
+            session.add(existing_user)
+            await session.commit()
+            print("  ✓ web_user_001 updated to Pro tier")
+
     await engine.dispose()
     print("\n✅ Seeding complete!")
 

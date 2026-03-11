@@ -1,13 +1,15 @@
 import Link from 'next/link'
-import { BookOpen, BarChart2, Zap, Shield, Clock, Users } from 'lucide-react'
+import { BookOpen, BarChart2, Zap, Shield, Clock, Users, Brain, Sparkles, LayoutDashboard } from 'lucide-react'
 
 const features = [
-  { icon: BookOpen,  title: 'Content Delivery',   desc: '5 chapters on AI Agent Development, served verbatim from Cloudflare R2.' },
+  { icon: BookOpen,  title: 'Content Delivery',   desc: '5 chapters on AI Agent Development, served verbatim from the database.' },
   { icon: Zap,       title: 'Grounded Q&A',        desc: 'Search course content and get answers backed exclusively by the material.' },
-  { icon: Shield,    title: 'Rule-Based Quizzes',  desc: '5-question quizzes per chapter, graded by answer key — no LLM in the backend.' },
+  { icon: Shield,    title: 'Rule-Based Quizzes',  desc: '25 questions total, graded by answer key — zero LLM cost in Phase 1.' },
   { icon: BarChart2, title: 'Progress & Streaks',  desc: 'Track chapter completions, quiz scores, and daily learning streaks.' },
+  { icon: Brain,     title: 'AI Assessment',       desc: 'Claude Sonnet grades your free-form written answers with detailed feedback. Pro.' },
+  { icon: Sparkles,  title: 'Cross-Chapter Synthesis', desc: 'Claude connects concepts across chapters into a big-picture explanation. Pro.' },
   { icon: Clock,     title: '24/7 Availability',   desc: '168 hours a week, unlimited concurrent students, 99%+ consistency.' },
-  { icon: Users,     title: 'Freemium Gate',       desc: 'First 3 chapters free. Upgrade to Premium for all 5 chapters and quizzes.' },
+  { icon: Users,     title: 'Freemium Gate',       desc: 'First 3 chapters free. Upgrade to Premium/Pro for all features.' },
 ]
 
 export default function HomePage() {
@@ -16,7 +18,7 @@ export default function HomePage() {
       {/* Hero */}
       <div className="text-center mb-16">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-sm font-medium mb-4">
-          <Zap size={14} /> Zero-Backend-LLM · Phase 1
+          <Zap size={14} /> Phase 1 + 2 + 3 · Agent Factory Architecture
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
           Your 24/7 AI Tutor for<br />
@@ -27,11 +29,14 @@ export default function HomePage() {
           Powered by the Agent Factory Architecture — at 99% less cost than human tutors.
         </p>
         <div className="flex justify-center gap-3 flex-wrap">
-          <Link href="/chapters" className="btn-primary text-base px-6 py-3">
+          <Link href="/dashboard" className="btn-primary text-base px-6 py-3">
+            <LayoutDashboard size={18} /> Open Dashboard
+          </Link>
+          <Link href="/chapters" className="btn-secondary text-base px-6 py-3">
             <BookOpen size={18} /> Start Learning
           </Link>
-          <Link href="/progress" className="btn-secondary text-base px-6 py-3">
-            <BarChart2 size={18} /> My Progress
+          <Link href="/upgrade" className="btn-secondary text-base px-6 py-3">
+            <Sparkles size={18} /> View Pricing
           </Link>
         </div>
       </div>
@@ -53,7 +58,7 @@ export default function HomePage() {
 
       {/* Features */}
       <h2 className="text-2xl font-bold text-gray-900 mb-6">What You Can Do</h2>
-      <div className="grid md:grid-cols-3 gap-4 mb-16">
+      <div className="grid md:grid-cols-4 gap-4 mb-16">
         {features.map(({ icon: Icon, title, desc }) => (
           <div key={title} className="card p-5">
             <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center mb-3">

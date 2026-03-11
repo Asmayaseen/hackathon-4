@@ -125,6 +125,14 @@ export async function getHybridUsage(userId: string) {
   return apiFetch(`/hybrid/usage/${userId}`, {}, userId)
 }
 
+// ─── Phase 3 Admin ────────────────────────────────────────────────────────────
+
+export async function getAdminStats() {
+  const res = await fetch(`${BASE_URL}/admin/stats`)
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
+
 // ─── Access ───────────────────────────────────────────────────────────────────
 
 export async function checkAccess(
