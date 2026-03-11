@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
-from app.routers import access, chapters, health, hybrid, progress, quizzes, search
+from app.routers import access, admin, chapters, health, hybrid, progress, quizzes, search
 
 
 @asynccontextmanager
@@ -49,3 +49,4 @@ app.include_router(quizzes.router)
 app.include_router(progress.router)
 app.include_router(access.router)
 app.include_router(hybrid.router)   # Phase 2 — Pro-gated hybrid intelligence
+app.include_router(admin.router)    # Phase 3 — Admin statistics

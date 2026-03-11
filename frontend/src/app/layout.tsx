@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="flex-1">{children}</main>
         <footer className="border-t border-gray-200 py-6 mt-12">
           <div className="max-w-5xl mx-auto px-4 text-center text-sm text-gray-500">
-            Course Companion FTE · Panaversity Agent Factory Hackathon IV · Phase 1 Zero-Backend-LLM
+            Course Companion FTE · Panaversity Agent Factory Hackathon IV · Phase 1 + 2 + 3 Complete
           </div>
         </footer>
       </body>
